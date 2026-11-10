@@ -5473,7 +5473,7 @@ if(_thingNameInput && _dontKnowNameBtn){
 
 <script>
 /* v168: 出身欄の入力チェック
-   優先順：かな → 広西 → 省/州/市 */
+   優先順：かな → 広西 → 省/市 */
 (()=>{
  const input=document.getElementById("shusshinInput");
  const pop=document.getElementById("originRetryPopup");
@@ -5524,8 +5524,8 @@ if(_thingNameInput && _dontKnowNameBtn){
      input.focus();
      return false;
    }
-   if(/[省州市]/.test(v)){
-     const hit=v.match(/[省州市]/)?.[0] || "";
+   if(/[省市]/.test(v)){
+     const hit=v.match(/[省市]/)?.[0] || "";
      show(`请不要输入“${hit}”。<br>只输入地名就可以。`);
      input.value="";
      input.dispatchEvent(new Event("input",{bubbles:true}));
