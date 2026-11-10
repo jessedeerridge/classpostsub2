@@ -4943,14 +4943,14 @@ function renderPosts(){
    const needsNa=!!(item&&item[2]);
    const noun=(adj==="おおきい"||adj==="ちいさい")?"まち":"ところ";
    return `<span class="post-answer-line">
-     ${i===0?`<span class="posted-place-plain">${esc(p.place)}</span><span>は</span>`:""}
+     ${i===0?`<span class="posted-place-plain" data-town-name>${esc(p.place)}</span><span>は</span>`:""}
      <span class="posted-card"><span>${esc(adj)}</span><span class="posted-cn">${esc(cn)}</span></span>
      ${needsNa?'<span class="na-card">な</span>':""}<span>${noun}です。</span>
    </span>`;
   }).join("");
 
   const thingLine=p.thing?`<span class="post-third-line">
-    <span class="posted-place-plain">${esc(p.place)}</span><span>に</span>
+    <span class="posted-place-plain" data-town-name>${esc(p.place)}</span><span>に</span>
     ${thingCardsHtml(p.thing)}
     <span>が あります。</span>
     ${p.thingName&&p.thingName!=="×"?`<span class="posted-place-plain">${esc(p.thingName)}</span><span>です。</span>`:""}
@@ -4999,7 +4999,7 @@ function renderPosts(){
 
       if(rule.useGa && i===0){
         return `<span class="town-post-sentence">
-          <span class="posted-place-plain">${esc(p.place)}</span><span>は</span>
+          <span class="posted-place-plain" data-town-name>${esc(p.place)}</span><span>は</span>
           <span class="posted-card"><span>${esc(adj)}</span><span class="posted-cn">${esc(cn)}</span></span>
           <span>ですが、</span>
         </span>`;
@@ -5007,7 +5007,7 @@ function renderPosts(){
 
       const noun=(adj==="おおきい"||adj==="ちいさい")?"まち":"ところ";
       return `<span class="town-post-sentence">
-        ${i===0?`<span class="posted-place-plain">${esc(p.place)}</span><span>は</span>`:""}
+        ${i===0?`<span class="posted-place-plain" data-town-name>${esc(p.place)}</span><span>は</span>`:""}
         <span class="posted-card"><span>${esc(adj)}</span><span class="posted-cn">${esc(cn)}</span></span>
         ${needsNa?'<span class="na-card">な</span>':""}<span>${noun}です。</span>
       </span>`;
@@ -5021,10 +5021,25 @@ function renderPosts(){
 
   row.innerHTML=`<span class="posted-name">（${esc(p.author)}）</span>
     <span class="post-origin-line">
-      <span class="shusshin-wa">私のまちは</span><span class="posted-place-plain">${esc(p.place)}</span><span>です。</span>
+      <span class="shusshin-wa">私のまちは</span><span class="posted-place-plain" data-town-name>${esc(p.place)}</span><span>です。</span>
       ${firstDescription}
     </span>
     ${thingLine}${finalLine}`;
+  if(userName==="あさの"){
+    row.querySelectorAll("[data-town-name]").forEach(el=>{
+      el.setAttribute("role","button");
+      el.tabIndex=0;
+      el.title="町名を編集";
+      el.style.cursor="pointer";
+      ["pointerdown","pointerup","pointercancel"].forEach(type=>{
+        el.addEventListener(type,e=>e.stopPropagation());
+      });
+      el.addEventListener("click",e=>{e.stopPropagation();editPostPlace(p.id)});
+      el.addEventListener("keydown",e=>{
+        if(e.key==="Enter"||e.key===" "){e.preventDefault();editPostPlace(p.id)}
+      });
+    });
+  }
   d.appendChild(row);
 
   const wrap=document.createElement("div");wrap.className="me-too-wrap";
@@ -5058,6 +5073,23 @@ function renderPosts(){
  });
  restorePosition();
  requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(restorePosition)));
+}
+function editPostPlace(id){
+ if(userName!=="あさの")return;
+ const p=posts.find(x=>String(x.id)===String(id));
+ if(!p)return;
+ const value=prompt("町名を編集してください。",p.place);
+ if(value===null)return;
+ const place=value.trim();
+ if(!place || /[\u3040-\u309F\u30A0-\u30FF省市]/.test(place) || place.includes("広西") || place.includes("广西")){
+   alert("町名を中国語で入力してください（省・市・广西は含めないでください）。");
+   return;
+ }
+ if(place===p.place)return;
+ p.place=place;
+ localStorage.setItem(POSTS_KEY,JSON.stringify(posts));
+ syncPlaceToDB(id,place);
+ renderPosts();
 }
 function deletePost(id){
  if(userName!=="あさの")return;
@@ -5108,6 +5140,7 @@ async function flushQ(){
  for(const op of readQ()){
   try{
    if(op.type==="post")await dbSet(dbRef(db,DB_POSTS_PATH+"/"+op.post.id),op.post);
+   if(op.type==="place")await dbSet(dbRef(db,DB_POSTS_PATH+"/"+op.id+"/place"),op.place);
    if(op.type==="delete")await dbRemove(dbRef(db,DB_POSTS_PATH+"/"+op.id));
    if(op.type==="metoo")await dbRunTransaction(dbRef(db,DB_POSTS_PATH+"/"+op.id+"/meTooCount"),v=>Number(v||0)+1);
   }catch(e){remain.push(op)}
@@ -5117,6 +5150,10 @@ async function flushQ(){
 async function syncPostToDB(p){
  if(!firebaseReady||!navigator.onLine){queue({type:"post",post:p});return}
  try{await dbSet(dbRef(db,DB_POSTS_PATH+"/"+p.id),p)}catch{queue({type:"post",post:p})}
+}
+async function syncPlaceToDB(id,place){
+ if(!firebaseReady||!navigator.onLine){queue({type:"place",id,place});return}
+ try{await dbSet(dbRef(db,DB_POSTS_PATH+"/"+id+"/place"),place)}catch{queue({type:"place",id,place})}
 }
 async function syncDeleteFromDB(id){
  if(!firebaseReady||!navigator.onLine){queue({type:"delete",id});return}
